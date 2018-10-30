@@ -1,0 +1,36 @@
+# changing window title for back compatibility with CMD taskkill/tasklist commands
+$host.ui.RawUI.WindowTitle = "ServiceCheck"
+
+# Function to get current Uptime of system in minutes
+Function Get-Uptime {
+    $os = Get-WmiObject win32_operatingsystem -ErrorAction SilentlyContinue
+    return ([math]::Round(((Get-Date) - $os.ConvertToDateTime($os.LastBootUpTime)).TotalMinutes))
+}
+
+
+
+Function Start-BrokenServices($ServicesFile) {
+    $up=Get-Uptime
+    $computername = $env:COMPUTERNAME
+
+    $services = Get-Content $ServicesFile
+    If ( $services -ne $Null ) {
+            foreach ($service in $services) {
+
+            # By using -EQ "Automatic" we grep both automatic and automatic delayed services
+            Get-Service -DisplayName $service -ErrorAction Ignore | Where-Object {$_.StartType -eq "Automatic"}  | ForEach-Object {
+
+                $Servicename = $_.Name
+                
+                Write-Host ""
+
+                              
+               (Get-WmiObject Win32_Service -Filter "DisplayName='$($_.DisplayName)'").StartService() | Out-Null
+                
+            }
+        }
+    }
+}
+
+# To start broken services function we only need to provide list of services
+Start-BrokenServices ($PSScriptRoot + "\services.txt")
