@@ -1,0 +1,25 @@
+ param (
+    [string]$fromDate = '2017-11-01',
+    [string]$toDate = '2018-02-28'
+ )
+
+$ServerName = "server1,1433"
+$DatabaseName = "db"
+
+$Query = "" 
+#Timeout parameters
+$QueryTimeout = 120
+$ConnectionTimeout = 30
+
+#Action of connecting to the Database and executing the query and returning results if there were any.
+$conn=New-Object System.Data.SqlClient.SQLConnection
+$ConnectionString = "Server={0};Database={1};Integrated Security=True;Connect Timeout={2}" -f $ServerName,$DatabaseName,$ConnectionTimeout
+$conn.ConnectionString=$ConnectionString
+$conn.Open()
+$cmd=New-Object system.Data.SqlClient.SqlCommand($Query,$conn)
+$cmd.CommandTimeout=$QueryTimeout
+$ds=New-Object system.Data.DataSet
+$da=New-Object system.Data.SqlClient.SqlDataAdapter($cmd)
+[void]$da.fill($ds)
+$ds.Tables
+$conn.Close()
