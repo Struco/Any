@@ -1,0 +1,76 @@
+$headers = New-Object "System.Collections.Generic.Dictionary[[String],[String]]"
+
+
+Function LogWrite
+{
+    Param ([string]$log,
+           [string]$logfile="$PSScriptRoot\log.log")
+    Write-Output $log | Out-File $logfile -Append   
+}
+
+    $time = (Get-Date).Addminutes(-1)
+
+try {        
+    #events from application log
+    $appevents = Get-WinEvent -FilterHashtable @{Logname="Application";StartTime=$time;level=1,2,3} -ErrorAction SilentlyContinue  | ? {$_.ProviderName -like '*test*'}
+    
+    #events from system log
+    $events = Get-WinEvent -FilterHashtable @{Logname="System";StartTime=$time} -ErrorAction SilentlyContinue | ? {$_.ProviderName -like 'Service Control Manager' -AND $_.Message -like '*test*'}
+
+    if ($appevents)
+    {
+    
+        foreach ($appevent in $appevents)
+        {
+            
+            
+               $schema = [ordered]@{
+        
+                event_timestamp=($appevent.TimeCreated.ToString("o"))
+                severity=$appevent.LevelDisplayName
+                event_id=$appevent.Id
+                service=$appevent.ProviderName
+                message=$appevent.Message
+                computername=$env:COMPUTERNAME
+                dashboard=''
+                }         
+
+               $json = ConvertTo-Json -InputObject @($schema)               
+               Invoke-RestMethod '' -Headers $headers -Body $json -Method Post -ErrorAction Stop
+        }
+        
+    }
+
+    if ($events)
+    {
+
+        foreach ($event in $events)
+        {
+               $schema = [ordered]@{
+        
+                event_timestamp=($event.TimeCreated.ToString("o"))
+                severity=$event.LevelDisplayName
+                event_id=$event.Id
+                service=(($event.Message | Select-String -Pattern '' | %{$_.Matches | Select Value}).Value)
+                message=$event.Message
+                computername=$env:COMPUTERNAME
+                dashboard=''
+                }
+               
+               $json = ConvertTo-Json -InputObject @($schema)
+               Invoke-RestMethod 'http://' -Headers $headers -Body $json -Method Post -ErrorAction Stop
+        }
+    }
+
+    }
+
+    catch{
+            if ($error[0] -contains 'No events were found' -or $error[0] -contains 'timed out' )
+            {
+                Write-Host "No events were found or timeout"
+            }
+            else
+            {
+                LogWrite("$(Get-date) $error[0]")
+            }
+    }
